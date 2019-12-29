@@ -1,0 +1,14 @@
+version: '3'
+services:
+  mqtt:
+    image: eclipse-mosquitto
+    volumes:
+      - 'data:/mosquitto/data'
+      - 'log:/mosquitto/log'
+    ports:
+      - '1883:1883'
+      - '9001:9001'
+    tty: true
+volumes:
+  data:
+  log:
