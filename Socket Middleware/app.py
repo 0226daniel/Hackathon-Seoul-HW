@@ -16,7 +16,7 @@ class SocketReceiver:
 
         self.sock: Optional[socket.socket] = None
 
-        self.hosts: Dict[str, dict] = {}
+        self.hosts: Dict[str, str] = {}
         self.socks: Dict[socket.socket, Tuple[str, int]] = dict()
 
         self.loop = loop or asyncio.get_event_loop()
@@ -56,6 +56,7 @@ class SocketReceiver:
         self.sock.setblocking(False)
 
         while True:
+            self.logger.info("waiting new connection")
             c_sock, c_addr = await self.loop.sock_accept(self.sock)
             self.socks[c_sock] = c_addr
             self.loop.create_task(self.handler(c_sock, c_addr))
@@ -63,46 +64,52 @@ class SocketReceiver:
     async def handler(self, c_sock: socket.socket, c_addr: Tuple[str, int]):
         msg = await self.recv(c_sock)  # Expect R:hostname
 
-        if not msg.startswith("R"):
-            return await self.destroy(c_sock, c_addr)
+        if not msg:
+            return
 
-        _, hostname = msg.split(":", 1)
+        mode, *data = msg.split(":", 1)
+        ip, port = c_addr
 
-        if hostname in self.hosts:  # If duplicated hostname
-            await self.sendall(c_sock, "E:Dup")
-            return await self.destroy(c_sock, c_addr)
+        if mode == "R":
+            hostname = data[0]
+            self.hosts[ip] = hostname
 
-        self.hosts[hostname] = {
-            "IP": c_addr[0],
-            "Port": c_addr[1],
-        }
+            await self.sendall(c_sock, "S:OK")
 
-        await self.sendall(c_sock, "S:OK")
-
-        msg = await self.recv(c_sock)  # Except C:
-
-        mode, *payload = msg.split(":", 1)
-
-        if mode != "C":
-            await self.sendall(c_sock, "E:Nah")
-            return await self.destroy(c_sock, c_addr)
-
-        assert mode, "C"
-
-        while True:
             msg = await self.recv(c_sock)
-            mode, *data = msg.split(":", 1)
+            mode, hostname, location = msg.split(":", 2)
+            lon, lat = map(float, location.split(","))
 
-    async def recv(self, sock: socket.socket, size: int = 2**12) -> str:
+            # TODO: Report to Backend
+            return await self.sendall(c_sock, "S:OK")
+
+        # Check registered hostname
+        if ip not in self.hosts:
+            await self.sendall(c_sock, "E:Auh")  # Auth required
+            return await self.destroy(c_sock, c_addr)
+
+        elif mode == "D":
+            pass
+
+    async def ensure_recv(self, sock: socket.socket, size: int = 2**12) -> bytes:
         payload = None
         while not payload:
             payload = await self.loop.sock_recv(sock, size)
 
-        msg: str = payload.decode()
-        ip, _ = self.socks.get(sock, ('256.256.256.256', 0))
-        self.logger.debug("S <- C {:>15}: {}".format(ip, msg))
+        return payload
 
-        return msg
+    async def recv(self, sock: socket.socket, size: int = 2**12) -> str:
+        ip, _ = self.socks.get(sock, ('256.256.256.256', 0))
+        try:
+            payload = await asyncio.wait_for(self.ensure_recv(sock, size), timeout=5.0)
+            msg: str = payload.decode()
+
+            self.logger.debug("S <- C {:>15}: {}".format(ip, msg))
+
+            return msg
+        except asyncio.TimeoutError:
+            self.logger.warning("T.O reading from {}".format(ip))
+            return ""
 
     async def sendall(self, sock: socket.socket, data: str) -> int:
         ip, _ = self.socks.get(sock, ('256.256.256.256', 0))
