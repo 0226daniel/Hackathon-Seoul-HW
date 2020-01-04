@@ -73,11 +73,11 @@ class SocketReceiver:
                         "Registered": datetime.now().timestamp()
                     }
 
-                    async with aiohttp.ClientSession() as sess:
+                    async with aiohttp.ClientSession(headers={"Content-Type": "application/x-www-form-urlencoded"}) as sess:
                         async with sess.post("http://r.kdw.kr:9999/{}".format(device_id),
                                              data="lat={}&lon={}".format(lat, lon)) as resp:
                             data = await resp.text()
-                            print(data)
+                            print("Backend respose:", data)
 
                     await self.write(reader, writer, b"S:OK")
                     await writer.drain()
