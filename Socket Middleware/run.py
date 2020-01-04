@@ -1,4 +1,4 @@
-from test_server import SocketReceiver
+from app import SocketReceiver
 
 
 server = SocketReceiver()
