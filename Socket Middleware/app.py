@@ -74,7 +74,8 @@ class SocketReceiver:
                     }
 
                     async with aiohttp.ClientSession() as sess:
-                        async with sess.post("http://r.kdw.kr:9999/{}?lon={}&lat={}".format(device_id, lon, lat)) as resp:
+                        async with sess.post("http://r.kdw.kr:9999/{}".format(device_id),
+                                             data="lat={}&lon={}".format(lat, lon)) as resp:
                             data = await resp.text()
                             print(data)
 
