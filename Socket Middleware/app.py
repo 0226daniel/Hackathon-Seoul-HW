@@ -89,7 +89,7 @@ class SocketReceiver:
         return data
 
     async def write(self, reader, writer, data: bytes):
-        ret = writer.write(data)
+        ret = writer.write(data + b"\r\n")
         self.logger.info(f"Send {writer.get_extra_info('peername')!r}: {data!r}")
         return ret
 
