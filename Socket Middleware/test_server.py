@@ -38,27 +38,41 @@ class SocketReceiver:
         return self.host, self.port 
 
     async def handle_echo(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-        addr = writer.get_extra_info('peername')
+        try:
+            addr = writer.get_extra_info('peername')
 
-        data = await self.read(reader, writer)
-        message = data.decode()
-        mode, device_id = message.split(":", 1)
-        self.logger.warning(f"Host {device_id}: Register requested")
+            data = await self.read(reader, writer)
+            message = data.decode()
+            mode, device_id = message.split(":", 1)
 
-        await self.write(reader, writer, b"S:OK")
-        await writer.drain()
-    
-        data = await self.read(reader, writer)
-        message = data.decode()
-        mode, device_id, location = message.split(":", 2)
-        lon, lat = map(float, location.split(",", 1))
-        self.logger.warning(f"Host {device_id}: Registered at {lon}, {lat}")
+            if mode != "R":
+                return await self.write(reader, writer, b"E:")
 
-        await self.write(reader, writer, b"S:OK")
-        await writer.drain()
-    
-        self.logger.info(f"Clse {addr!r}")
-        writer.close()
+            self.logger.warning(f"Host {device_id}: Register requested")
+
+            await self.write(reader, writer, b"S:OK")
+            await writer.drain()
+
+            data = await self.read(reader, writer)
+            message = data.decode()
+            try:
+                mode, device_id, location = message.split(":", 2)
+                lon, lat = map(float, location.split(",", 1))
+                self.logger.warning(f"Host {device_id}: Registered at {lon}, {lat}")
+
+                await self.write(reader, writer, b"S:OK")
+                await writer.drain()
+
+                self.logger.info(f"Clse {addr!r}")
+                writer.close()
+            except ValueError:  # unpacking not matched
+                return await self.write(reader, writer, b"E:Val")
+            except TypeError:  # cannot unpack
+                return await self.write(reader, writer, b"E:Tpe")
+
+            # TODO: Report to Backend
+        except:
+            return await self.write(reader, writer, b"E:Unk")
 
     async def read(self, reader, writer, size: int = 2**12) -> bytes:
         data = await reader.read(size)
