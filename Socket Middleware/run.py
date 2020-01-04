@@ -1,4 +1,4 @@
-from deprecate_app import SocketReceiver
+from test_server import SocketReceiver
 
 
 server = SocketReceiver()
