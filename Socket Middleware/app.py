@@ -1,4 +1,5 @@
 import asyncio
+import aiohttp
 import logging
 import colorlog
 from datetime import datetime
@@ -46,40 +47,56 @@ class SocketReceiver:
 
             data = await self.read(reader, writer)
             message = data.decode()
-            mode, device_id = message.split(":", 1)
+            mode, data = message.split(":", 1)
 
-            if mode != "R":
+            if mode not in ("R", "D"):
                 return await self.write(reader, writer, b"E:Mod")
 
-            self.logger.warning(f"Host {device_id}: Register requested")
-
-            await self.write(reader, writer, b"S:OK")
-            await writer.drain()
-
-            data = await self.read(reader, writer)
-            message = data.decode()
-            try:
-                mode, device_id, location = message.split(":", 2)
-                lon, lat = map(float, location.split(",", 1))
-                self.logger.warning(f"Host {device_id}: Registered at {lon}, {lat}")
-
-                self.sessions[device_id] = {
-                    "GPS": (lon, lat, ),
-                    "Address": addr,
-                    "Registered": datetime.now().timestamp()
-                }
+            # ------------------------------------------------------------------------ #
+            if mode == "R":
+                device_id = data
+                self.logger.warning(f"Host {device_id}: Register requested")
 
                 await self.write(reader, writer, b"S:OK")
                 await writer.drain()
 
-                self.logger.info(f"Clse {addr!r}")
-                writer.close()
-            except ValueError:  # unpacking not matched
-                return await self.write(reader, writer, b"E:Val")
-            except TypeError:  # cannot unpack
-                return await self.write(reader, writer, b"E:Tpe")
+                data = await self.read(reader, writer)
+                message = data.decode()
+                try:
+                    mode, device_id, location = message.split(":", 2)
+                    lon, lat = map(float, location.split(",", 1))
+                    self.logger.warning(f"Host {device_id}: Registered at {lon}, {lat}")
 
-            # TODO: Report to Backend
+                    self.sessions[device_id] = {
+                        "GPS": (lon, lat, ),
+                        "Address": addr,
+                        "Registered": datetime.now().timestamp()
+                    }
+
+                    async with aiohttp.ClientSession() as sess:
+                        async with sess.post(
+                                "http://r.kdw.kr:9999/{}".format(device_id),
+                                data="{},{}".format(lon, lat)) as resp:
+                            data = await resp.text()
+                            print(data)
+
+                    await self.write(reader, writer, b"S:OK")
+                    await writer.drain()
+
+                    self.logger.info(f"Clse {addr!r}")
+                    writer.close()
+                except ValueError:  # unpacking not matched
+                    return await self.write(reader, writer, b"E:Val")
+                except TypeError:  # cannot unpack
+                    return await self.write(reader, writer, b"E:Tpe")
+
+                # TODO: Report to Backend
+
+            # ------------------------------------------------------------------ #
+            else:  # Mode "D"ata
+                device_id, data = data.split(":", 1)
+                self.logger.warning(f"Host {device_id}: Incoming event data")
+
         except:
             return await self.write(reader, writer, b"E:Unk")
 
