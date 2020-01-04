@@ -89,8 +89,6 @@ class SocketReceiver:
                 except TypeError:  # cannot unpack
                     return await self.write(reader, writer, b"E:Tpe")
 
-                # TODO: Report to Backend
-
             # ------------------------------------------------------------------ #
             else:  # Mode "D"ata
                 device_id, data = data.split(":", 1)
