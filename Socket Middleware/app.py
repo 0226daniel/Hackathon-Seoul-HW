@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import colorlog
+from datetime import datetime
 
 from typing import Tuple
 
@@ -11,6 +12,8 @@ class SocketReceiver:
                  port: int = 8080):
         self.host = host
         self.port = port
+
+        self.sessions: dict = {}
 
         # logger setup
         self.logger = logging.getLogger(__name__)
@@ -46,7 +49,7 @@ class SocketReceiver:
             mode, device_id = message.split(":", 1)
 
             if mode != "R":
-                return await self.write(reader, writer, b"E:")
+                return await self.write(reader, writer, b"E:Mod")
 
             self.logger.warning(f"Host {device_id}: Register requested")
 
@@ -59,6 +62,12 @@ class SocketReceiver:
                 mode, device_id, location = message.split(":", 2)
                 lon, lat = map(float, location.split(",", 1))
                 self.logger.warning(f"Host {device_id}: Registered at {lon}, {lat}")
+
+                self.sessions[device_id] = {
+                    "GPS": (lon, lat, ),
+                    "Address": addr,
+                    "Registered": datetime.now().timestamp()
+                }
 
                 await self.write(reader, writer, b"S:OK")
                 await writer.drain()
