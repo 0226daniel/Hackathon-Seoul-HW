@@ -78,7 +78,7 @@ class SocketReceiver:
                         async with sess.post("http://r.kdw.kr:9999/{}".format(device_id),
                                              data="lat={}&lon={}".format(lat, lon)) as resp:
                             data = await resp.text()
-                            print("Backend respose:", data)
+                            print("Backend response:", data)
 
                     await self.write(reader, writer, b"S:OK")
                     await writer.drain()
@@ -94,15 +94,13 @@ class SocketReceiver:
             else:  # Mode "D"ata
                 device_id, data = data.split(":", 1)
                 self.logger.warning(f"Host {device_id}: Incoming event data")
-
-                hostname, percentage = data.split(":", 1)
-                percentage = float(percentage)
+                percentage = float(data)
 
                 if percentage:
                     async with aiohttp.ClientSession(headers={"Content-Type": "application/x-www-form-urlencoded"}) as sess:
                         async with sess.post("http://r.kdw.kr:9999/{}/event".format(device_id)) as resp:
                             data = await resp.text()
-                            print("Backend respose:", data)
+                            print("Backend response:", data)
                 return await self.write(reader, writer, b"S:OK")
         except:
             self.logger.critical(traceback.format_exc())
