@@ -97,11 +97,11 @@ class SocketReceiver:
                 hostname, percentage = data.split(":", 1)
                 percentage = float(percentage)
 
-                async with aiohttp.ClientSession(headers={"Content-Type": "application/x-www-form-urlencoded"}) as sess:
-                    async with sess.post("http://r.kdw.kr:9999/{}/event".format(device_id),
-                                         data="db={}".format(percentage)) as resp:
-                        data = await resp.text()
-                        print("Backend respose:", data)
+                if percentage:
+                    async with aiohttp.ClientSession(headers={"Content-Type": "application/x-www-form-urlencoded"}) as sess:
+                        async with sess.post("http://r.kdw.kr:9999/{}/event".format(device_id)) as resp:
+                            data = await resp.text()
+                            print("Backend respose:", data)
                 return await self.write(reader, writer, b"S:OK")
         except:
             return await self.write(reader, writer, b"E:Unk")
