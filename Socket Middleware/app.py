@@ -2,6 +2,7 @@ import asyncio
 import aiohttp
 import logging
 import colorlog
+import traceback
 from datetime import datetime
 
 from typing import Tuple
@@ -104,6 +105,7 @@ class SocketReceiver:
                             print("Backend respose:", data)
                 return await self.write(reader, writer, b"S:OK")
         except:
+            self.logger.critical(traceback.format_exc())
             return await self.write(reader, writer, b"E:Unk")
 
     async def read(self, reader, writer, size: int = 2**12) -> bytes:
